@@ -114,12 +114,19 @@
     function _submitForm(eventTarget, eventArgument, sender) {
 
         var form = $('form');
-        var extra = typeof (sender) == 'string' ? '&' + sender : '';
 
         _hiddenField('__EVENTTARGET', eventTarget);
         _hiddenField('__EVENTARGUMENT', eventArgument);
 
-        var data = form.serialize() + extra;
+        var data = new FormData(form.get(0));
+
+        if (typeof (sender) == 'string') {
+            var items = sender.split('&');
+            $.each(items, function (i, v) {
+                var kv = v.split('=');
+                data.append(kv[0], kv[1]);
+            });
+        }
 
         var opts = {
             type: 'POST',
@@ -127,6 +134,8 @@
             dataType: 'html',
             headers: _headers,
             data: data,
+            processData: false,
+            contentType: false,
             success: function (data, textStatus, jqXHR) {
 
                 // Update page
