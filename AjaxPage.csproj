@@ -68,6 +68,7 @@
     <Content Include="Demo\Abort.aspx" />
     <Content Include="Demo\Calendar.aspx" />
     <Content Include="Demo\Controls.aspx" />
+    <Content Include="Demo\TreeView2.aspx" />
     <Content Include="Demo\Upload.aspx" />
     <Content Include="Demo\TreeView.aspx" />
     <Content Include="Demo\Focus.aspx" />
