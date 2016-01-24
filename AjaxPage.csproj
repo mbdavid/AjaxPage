@@ -25,6 +25,7 @@
     <IISExpressAnonymousAuthentication />
     <IISExpressWindowsAuthentication />
     <IISExpressUseClassicPipelineMode />
+    <UseGlobalApplicationHostFile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -64,6 +65,8 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Default.aspx" />
+    <Content Include="Demo\Redirect.aspx" />
+    <Content Include="Demo\Main.aspx" />
     <Content Include="Demo\Buttons.aspx" />
     <Content Include="Demo\Abort.aspx" />
     <Content Include="Demo\Calendar.aspx" />
@@ -76,7 +79,7 @@
     <Content Include="Demo\Title.aspx" />
     <Content Include="Demo\Simple.aspx" />
     <Content Include="Scripts\jquery.js" />
-    <Content Include="Scripts\AjaxPage.js" />
+    <Content Include="Scripts\ajaxpage.js" />
     <Content Include="Web.config">
       <SubType>Designer</SubType>
     </Content>

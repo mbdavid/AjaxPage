@@ -32,39 +32,49 @@
     <input type="button" id="btn1" value="AjaxPage.method" />
     <input type="button" id="btn2" value="AjaxPage.method.Error" />
     <input type="button" id="btn3" value="AjaxPage.method.Error.2" />
+    <asp:Button runat="server" Text="Just a PostBack" />
 
     <hr />
 
     <script>
 
-        $(function () {
-
-            $('#btn1').click(function () {
-
-                AjaxPage.method('GetDate', { days: 10, text: 'from' }, function (data) {
-                    alert(data.Dia + ' - ' + data.Valor);
-                }, function (err) {
-                    alert('ERROR: ' + err);
-                });
-
+        $('#btn1').click(function () {
+            _method('GetDate', { days: 10, text: 'from' }, function (data) {
+                alert(data.Dia + ' - ' + data.Valor);
+            }, function (err) {
+                alert('ERROR: ' + err.Message);
             });
-
-            $('#btn2').click(function () {
-
-                AjaxPage.method('GetDate2', null, null, function (err) {
-                    alert('ERROR: ' + err);
-                });
-
-            });
-
-            $('#btn3').click(function () {
-                AjaxPage.method('GetDate2');
-            });
-
-
-            AjaxPage.onerror = (function (err) { alert('AjaxPage.onerror(' + err + ')'); });
-
         });
+
+        $('#btn2').click(function () {
+            _method('GetDate2', null, null, function (err) {
+                alert('ERROR: ' + err.Message);
+            });
+        });
+
+        $('#btn3').click(function () {
+            _method('GetDate2');
+        });
+
+        function _method(name, args, onsuccess, onerror) {
+
+            var url = location.href.replace(/\?.*$/, '') + '/' + name;
+
+            return $.ajax({
+                type: 'POST',
+                url: url,
+                data: args == null ? null : JSON.stringify(args),
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                cache: false,
+                success: function (r) {
+                    if (onsuccess) onsuccess(r.d);
+                },
+                error: function (r) {
+                    if (onerror) onerror(JSON.parse(r.responseText));
+                }
+            });
+        }
 
     
     </script>

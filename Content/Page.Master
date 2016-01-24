@@ -1,19 +1,67 @@
-﻿<%@ Master Language="C#" AutoEventWireup="true" %>
+﻿<%@ Master Language="C#" %>
+<script runat="server">
+
+    protected void Page_Load(object sender, EventArgs e)
+    {
+        //Page.ClientScript.RegisterClientScriptBlock(this.GetType(), "m0", "console.log('master-page: RegisterClientScriptBlock');", true);
+        //Page.ClientScript.RegisterStartupScript(this.GetType(), "m1", "console.log('master-page: RegisterStartupScript');", true);
+    }
+
+    protected string RenderMenu()
+    {
+        // avoid re-build menu when ajax page render
+        if (Request.Headers["X-Ajax-Page"] == "1") return "";
+
+        var links = System.IO.Directory.GetFiles(Server.MapPath("~/Demo"), "*.aspx", System.IO.SearchOption.AllDirectories)
+                .Select(x => System.IO.Path.GetFileName(x));
+
+        var sb = new StringBuilder("<ul>");
+
+        foreach(var link in links)
+        {
+            sb.AppendFormat("<li><a href='{0}'>{0}</a></li>", link);
+        }
+
+        return sb.ToString() + "</ul>";
+    }
+
+    protected void btn_Click(object sender, EventArgs e)
+    {
+        Page.ClientScript.RegisterClientScriptBlock(this.GetType(), "ms", "alert('from master page');", true);
+    }
+
+</script>
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
 <head runat="server">
-    <title></title>
+    <title>Master Page tests</title>
     <script src="../Scripts/jquery.js" type="text/javascript"></script>
-    <script src="../Scripts/AjaxPage.js" type="text/javascript"></script>
+    <script src="../Scripts/ajaxpage.js" type="text/javascript"></script>
+    <style>
+        .busybox {
+            background-color: yellow;
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            padding: 20px;
+            display: none;
+        }
+    </style>
     <asp:ContentPlaceHolder ID="head" runat="server"></asp:ContentPlaceHolder>
 </head>
 <body>
-    <form id="form1" runat="server">
-    <div>
-        <asp:ContentPlaceHolder ID="content" runat="server"></asp:ContentPlaceHolder>
-        <hr />
-        <a href="../Default.aspx">Index</a>
+    <div class="busybox">Waiting...</div>
+    <div style="width: 240px; float: left; border: 1px solid blue;">
+        <h2>Master Page</h2>
+        <%= RenderMenu() %>
+        <a href="javascript:location.href='/Default.aspx';">Logout (full-GET)</a><br />
+        <%= DateTime.Now %><br />
     </div>
-    </form>
+    <div style="border: 1px solid red; padding: 10px; margin-left: 250px">
+        <form id="form1" runat="server">
+            <asp:Button runat="server" Text="MasterPage Button" OnClick="btn_Click" /><hr />
+            <asp:ContentPlaceHolder ID="content" runat="server"></asp:ContentPlaceHolder>
+        </form>
+    </div>
 </body>
 </html>

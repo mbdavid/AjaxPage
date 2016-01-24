@@ -3,9 +3,11 @@
 
     protected void Page_Load(object sender, EventArgs e)
     {
+        Page.ClientScript.RegisterOnSubmitStatement(this.GetType(), "m2", "console.log('simple.aspx: RegisterOnSubmitStatement');");
+
         if (!IsPostBack)
         {
-            txt.Text = ">";
+            txt.Text =  Request.QueryString["p"];
         }
     }
 

@@ -34,6 +34,9 @@
     }
 
 </script>
+<asp:Content runat="server" ContentPlaceHolderID="head">
+
+</asp:Content>
 <asp:Content ID="ctrContent" ContentPlaceHolderID="content" runat="server">
 
     <asp:Button runat="server" ID="btn" OnClick="btn_Click" Text="FirstFocus" />
@@ -57,5 +60,11 @@
             </table>
         </FooterTemplate>
     </asp:Repeater>
+
+    <script>
+        function colors() {
+            $('input').css('background-color', 'yellow');
+        }
+    </script>
 
 </asp:Content>

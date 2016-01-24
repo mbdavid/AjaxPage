@@ -1,75 +1,57 @@
 ﻿/*
-  AjaxPage
-  ========
-  Como funciona: 
-  1) Apos a carga do GET
-    a) Captura os botões de image/submit
-    b) Faz cache dos <script src=".."> que foram carregados
-    c) Faz o submit via ajax, processa o retorno
+  Ajax Library
+  ============
+  How works: 
+  1) After GET
+    a) Capture all image/submit buttons
+    b) Do cache of all external scripts <script src="..">
+    c) Do submit using FormData and XmlHttp
 
-  2) Processar o retorno
-    a) Remove <style> e <scripts>
-    b) Atualiza somente o HTML
-    c) Monta um array com todos os scripts: Os externos que já estao na cache, nao são adicionados no array
-    d) Executa todos os scripts externos, depois os inlines.
-    e) Alguns scripts "inline" não executa (provavelmente do ScriptManager)
-  Regra de execução de scripts:
-    Inline: body > Sempre (em todos requests) - head > Somente GET
-    Externo: body || head > Apenas 1 vez, apos isso é feito cache e nao executa mais.
+  2) Processing data return
+    a) Remove <style> and <scripts> tags
+    b) Update only BODY tag
+    c) Build an array with all scripts that will be run
+    d) Execute all scripts in script array.
+    e) Some "inline" scripts will not be run (like ScriptManager)
+  Rules to execute scripts:
+    Inline: body > Always - head > Only GET
+    External: body || head > Only first time - cache-it.
+
+//TODO:
+    - <link rel=stylesheet> works only when in master page (full GET)
+    - How works with pageLoad/$(fn)/...
+
+=> TARGET: page must works FINE without this lib. If, in future, I want remove, every needs works
+    - This is not means that all apps works only adding this .js
+
 */
-
-// TODO: não permitir reenvio enquanto nao tiver o processamento OK
-
 
 (function (window, $) {
 
-    var _cache = {}; // Cache scripts
-    var _headers = { 'X-Ajax-Page': '1' }; // Header on request to identify AjaxPage GET/POST
-    var _xhr = null;
-    var _ajaxPage = {};
+    var cache = {}; // cache scripts
+    var headers = { 'X-Ajax-Page': '1' }; // header on request to identify AjaxPage GET/POST
+    var xhr = null;
 
-    _ajaxPage.abort = _abort;
-    _ajaxPage.method = _method;
-    _ajaxPage.onreject = function () { };
-    _ajaxPage.onstart = function () { };
-    _ajaxPage.onend = function () { };
-    _ajaxPage.onerror = null;
-
-    // Publish AjaxPage object
-    window.AjaxPage = _ajaxPage;
-
-    // Log capture
-    var log = function () {
-        if (console && console.log) {
-            console.log(arguments);
-        }
-    }
-
-    // Start AjaxPage
+    // start ajaxpage
     $(function () {
 
-        // Disabling AjaxPage
-        if (window.EnableAjaxPage === false) {
-            log('EnableAjaxPage = false');
-            return;
-        }
+        // make some validations
+        if ($('head').length == 0) { console.error('No <head> tag found: AjaxPage disabled'); return; }
+        if ($('form').length != 1) { console.error('No <form> tag found or more than one: AjaxPage disabled'); return; }
 
-        // Make some validations
-        if ($('head').length == 0) { log('No <head> tag found: AjaxPage disabled'); return; }
-        if ($('form').length != 1) { log('No <form> tag found or more than one: AjaxPage disabled'); return; }
+        bindAddToPostBack();
 
-        _bindAddToPostBack();
-
-        // At this point, all script already run. Just to create cache items
-        _addScripts($('head').html(), [], false);
-        _addScripts($('body').html(), [], false);
+        // at this point, all script already run, just to create cache items
+        addScripts($('head').html(), [], false);
+        addScripts($('body').html(), [], false);
 
         // capturing possible submit buttons
         $(document).on('click', 'input[type=submit],input[type=button],button', function (e) {
             var input = $(this);
             $('form').data('sender', input.attr('name') + '=' + input.val());
         });
-        // Capture input[type=image] click 
+
+        // capture input[type=image] click 
         $(document).on('click', 'input[type=image]', function (e) {
             var input = $(this);
             $('form').data('sender', input.attr('name') + '.x=' + e.offsetX + '&' + input.attr('name') + '.y=' + e.offsetY);
@@ -77,27 +59,25 @@
 
         // capture submit event from submit buttons
         $(document).on('submit', 'form', function (e) {
-
             e.preventDefault();
             var form = $(this);
             var sender = form.data('sender');
             form.removeData('sender');
-            _submitForm(null, null, sender);
+            submitForm(null, null, sender);
             return false;
-
         });
 
     });
 
-    function _bindAddToPostBack() {
-        _addToPostBack(function (t, a) {
-            _submitForm(t, a, null);
+    function bindAddToPostBack() {
+        addToPostBack(function (t, a) {
+            submitForm(t, a, null);
             return false;
         });
     }
 
     // capture __doPostBack function
-    _addToPostBack = function (func) {
+    addToPostBack = function (func) {
 
         if (typeof (__doPostBack) != 'function') {
             __doPostBack = func;
@@ -110,16 +90,19 @@
         }
     };
 
-    // Submiting a form
-    function _submitForm(eventTarget, eventArgument, sender) {
+    // submiting a form
+    function submitForm(eventTarget, eventArgument, sender) {
 
         var form = $('form');
 
-        _hiddenField('__EVENTTARGET', eventTarget);
-        _hiddenField('__EVENTARGUMENT', eventArgument);
+        // set target/argument event hidden values
+        hiddenField(form, '__EVENTTARGET', eventTarget);
+        hiddenField(form, '__EVENTARGUMENT', eventArgument);
 
+        // get FormData from form
         var data = new FormData(form.get(0));
 
+        // add sender values (when button clicked)
         if (typeof (sender) == 'string') {
             var items = sender.split('&');
             $.each(items, function (i, v) {
@@ -128,187 +111,252 @@
             });
         }
 
+        // prepare options for ajax request
         var opts = {
             type: 'POST',
             url: form.attr('action'),
             dataType: 'html',
-            headers: _headers,
+            headers: headers,
             data: data,
             processData: false,
             contentType: false,
             success: function (data, textStatus, jqXHR) {
-
-                // Update page
-                _updatePage(data, textStatus, jqXHR);
-
-                // Trigger page load event
-                $(window).triggerHandler('load');
-
+                updatePage(data);
+                $(window).trigger('load');
             },
-            error: _errorPage
+            error: function(data, args, textStatus) {
+                if (textStatus != 'abort') {
+                    updatePage(data.responseText);
+                }
+            }
         };
 
-        _request(opts);
+        // run ajax request
+        request(opts);
     }
 
-    function _abort() {
+    // set (add out update) an input hidden value in a form
+    function hiddenField(form, id, value) {
 
-        if (_xhr && _xhr.readyState != 4) {
-            _xhr.abort();
+        var input = $('#' + id, form);
+
+        if (input.length == 0 && value != null) {
+            input = $('<input />')
+                .attr({ 'name': id, 'id': id, 'type': 'hidden' })
+                .appendTo(form);
         }
-    }
-
-    function _hiddenField(id, value) {
-
-        var input = $('#' + id);
-
-        if (input.length == 0 && value != null)
-            input = $('<input />').attr({ 'name': id, 'id': id, 'type': 'hidden' }).appendTo($('form'));
 
         input.val(value);
     }
 
-    // Update body page
-    function _updatePage(data, textStatus, jqXHR) {
+    // update body page
+    function updatePage(html, verb) {
 
-        var matchHead = data.match(/<head.*>[\s\S]*<\/head>/i);
-        var matchBody = data.match(/<body.*>[\s\S]*<\/body>/i);
-        var matchStyle = data.match(/<style.*>[\s\S]*<\/style>/gi);
+        var matchHead = html.match(/<head.*>[\s\S]*<\/head>/i);
+        var matchBody = html.match(/<body.*>[\s\S]*<\/body>/i);
+        var matchForm = html.match(/<form.*>[\s\S]*<\/form>/i);
+        var matchStyle = html.match(/<style.*>[\s\S]*<\/style>/gi);
         var scripts = [];
 
-        // Setting title
-        document.title = _title(data) || document.title;
+        // setting title
+        document.title = title(html) || document.title;
 
+        // getting all scripts in body that will be run later
+        if (matchBody) {
+            addScripts(matchBody[0], scripts, true);
+        }
+
+        // append all styles in header
         if (matchStyle) {
             for (var i = 0; i < matchStyle.length; i++) {
                 $('head').append(matchStyle[i]);
             }
         }
 
-        if (matchBody) {
+        // if has scripts in head tag, add to cache and list too
+        // if is a GET, execute inline scripts
+        if (matchHead) {
+            addScripts(matchHead[0], scripts, verb == 'GET');
+        }
 
-            var html = matchBody[0];
-            var lastfocus = $(document.activeElement).attr('id');
+        if (matchForm) {
 
-            // removing <body> tags
-            html = html.replace(/^<body.*?>/i, '').replace(/<\/body>$/i, '');
+            var form = matchForm[0];
+            var focus = $(document.activeElement).attr('id');
 
-            // removing styles inside body
-            html = html.replace(/<style.*>[\s\S]*<\/style>/gi, '');
+            // get form action and update in current form
+            var action = clearHtml(form.match(/action=["'](.*?)["']/i)[1]);
 
-            // addScripts to cache and get all script must be run after update body
-            html = _addScripts(html, scripts, true);
+            // removing <form> tag, styles and scripts
+            form = form.replace(/^<form.*?>/i, '').replace(/<\/form>$/i, '');
+            form = form.replace(/<style.*>[\s\S]*<\/style>/gi, '');
+            form = form.replace(/<script.*?>[\s\S]*?<\/.*?script>/gi, '');
 
-            // Replace body
-            $('body').html(html);
+            // if action is different from location bar, change location bar
+            history.replaceState(null, null, action);
 
-            // Set focus
-            if (lastfocus) {
-                var l = document.getElementById(lastfocus);
-                if (l) { try { l.focus(); } catch (e) { } }
+            //TODO: problem: erase last REDIRECT page from history
+            //console.log('action=', action);
+            //console.log('location.href=', location.href);
+
+            // update form action and content
+            $('form').attr('action', action).html(form);
+
+            // set focus
+            if (focus) {
+                $('#' + focus).focus();
             }
         }
 
-        // If has scripts in head tag, add to cache and list too
-        if (matchHead) {
-            _addScripts(matchHead[0], scripts, false);
-        }
+        // clear all variables from WebResources.axd
+        clearVars();
 
-        // Clear all variables from WebResources.axd
-        _clearVars();
+        // update base href
+        var base = $('base');
+        if (base.length == 0) base = $('<base>').appendTo($('head'));
+        base.attr('href', location.href);
 
-        // Execute all scripts on array
+        // execute all scripts on array
         $.each(scripts, function (index, script) {
             $('head').append(script);
         });
     }
 
-    function _errorPage(data, args, textStatus) {
-
-        if (textStatus != 'abort') {
-            // if has a onerror capture, do not show on screen. 
-            if (_ajaxPage.onerror == null) {
-                _updatePage(data.responseText);
-            }
-            else {
-                // Get <title> error message
-                _ajaxPage.onerror(_title(data.responseText));
-            }
-        }
-    }
-
-    // Create a cache scripts. 
-    // If includeScriptBlock == false, ignore inlineScript
-    function _addScripts(html, scripts, includeInlineScript) {
+    // get all scripts that are not in cache
+    function addScripts(html, scripts, includeInline) {
 
         var matchScripts = html.match(/<script.*?>[\s\S]*?<\/.*?script>/gi);
 
         // No javascript, just return html
-        if (!matchScripts) return html;
+        if (!matchScripts) return;
 
         for (var i = 0; i < matchScripts.length; i++) {
 
-            var script = matchScripts[i]; // Script tag, including <script> .. </script>
+            var script = matchScripts[i]; // script tag, including <script> .. </script>
 
-            // Test if is a external JS
+            // test if is a external JS
             if (script.match(/<script.*src=["'].*?["']>/i) != null) {
 
                 // get just src="..."
-                var src = _clear(script.match(/src=["'].*?["']/i)[0]); //Clear html codes &amp; => &
+                var src = clearHtml(script.match(/src=["'].*?["']/i)[0]); // clear html codes &amp; => &
 
                 // remove "no-cache" urls
                 src = src.replace(/[\?&][t_]=[0-9\.]*/, ''); // removing &t=<time>
 
-                if (!_cache[src]) { // Test if is in cache. If not, add to cache and list to run
-                    _cache[src] = true;
+                if (!cache[src]) { // test if is in cache, if not, add to cache and list to run
+                    cache[src] = true;
                     scripts.push(script);
                 }
             }
-                // Inline scripts
-            else if (includeInlineScript) {
+            // inline scripts
+            else if (includeInline) {
 
+                // ignore if script it's only __doPostBack definition
                 if (script.match(/function __doPostBack\(eventTarget, eventArgument\)/) != null) {
-                    // Ignore if script it's only __doPostBack definition
                 }
                 else {
                     scripts.push(script);
                 }
             }
-
-            // Removing script from HTML
-            html = html.replace(script, '');
-        }
-
-        return html;
-    }
-
-    // Manage ajax requests
-    function _request(opts) {
-
-        if (_xhr != null) {
-            _ajaxPage.onreject();
-        }
-        else {
-            _xhr = $.ajax(opts);
-            _ajaxPage.onstart();
-            _xhr.always(function () {
-                _ajaxPage.onend();
-                _xhr = null;
-            });
         }
     }
 
-    // Clear html codes (like &amp; => &)
-    function _clear(text) {
+    // capture all links to use history.pushState
+    $(document).on('click', 'a', function (e) {
+
+        var href = $(this).attr('href');
+
+        if (href.indexOf('#') == 0 || href.indexOf('javascript:') == 0) return;
+
+        // prevent default link redirect
+        e.preventDefault();
+
+        // avoid request ajax queue
+        if (xhr != null) return false;
+
+        // change location without refresh and call by ajax
+        history.pushState(null, null, href);
+        redirect(href);
+
+        return false;
+    });
+
+    // register history changes (backward/fordward browser buttons)
+    window.addEventListener('popstate', function (e) {
+        redirect(location.href);
+    });
+
+    // redirect a page using ajax "history"
+    function redirect(url) {
+
+        // prepare options for GET ajax request
+        var opts = {
+            type: 'GET',
+            url: url,
+            dataType: 'html',
+            headers: headers,
+            processData: false,
+            contentType: false,
+            success: function (data, textStatus, jqXHR) {
+                updatePage(data, 'GET');
+                $(window).trigger('load');
+            },
+            error: function (data, args, textStatus) {
+                if (textStatus != 'abort') {
+                    updatePage(data.responseText);
+                }
+            }
+        };
+
+        // run ajax request
+        request(opts);
+    }
+
+    // busybox control (use .busybox css class)
+    var busybox = {
+        delay: 500,
+        running: false,
+        start: function () {
+            busybox.running = true;
+            setTimeout(function () {
+                if (busybox.running) {
+                    $('.busybox').show();
+                }
+            }, busybox.delay);
+        },
+        end: function () {
+            $('.busybox').hide();
+            busybox.running = false;
+        }
+    }
+
+    // execute ajax request + busybox
+    function request(options) {
+
+        // avoid request ajax queue
+        if (xhr != null) return;
+
+        xhr = $.ajax(options);
+
+        busybox.start();
+
+        xhr.always(function () {
+            busybox.end();
+            xhr = null; // clear xhr when finish
+        }); 
+    }
+
+    // clear html codes (like &amp; => &)
+    function clearHtml(text) {
         return $('<div />').html(text).text();
     }
 
-    // Clear variables from WebForms scripts WebResources.axd
-    function _clearVars() {
+    // clear variables from WebForms scripts WebResources.axd
+    function clearVars() {
 
         window.theForm = document.forms[0];
 
-        if (typeof (WebForm_PostBackOptions) == 'function') {
+        if (typeof (window.WebForm_PostBackOptions) == 'function') {
             window.__pendingCallbacks = new Array();
             window.__synchronousCallBackIndex = -1;
             window.__theFormPostData = "";
@@ -316,58 +364,32 @@
             window.__disabledControlArray = new Array();
         }
 
-        if (typeof (ValidatorUpdateDisplay) == 'function') {
+        if (typeof (window.ValidatorUpdateDisplay) == 'function') {
             window.Page_IsValid = true;
             window.Page_BlockSubmit = false;
             window.Page_InvalidControlToBeFocused = null;
             window.__theFormPostCollection = new Array();
             window.__disabledControlArray = new Array();
         }
+
+        if (typeof (window.WebForm_OnSubmit) == 'function') {
+            window.WebForm_OnSubmit = function () { return true; }
+        }
+
     }
 
-    // Get <title>
-    function _title(html) {
+    // get <title> content
+    function title(html) {
 
         var matchTitle = html.match(/<title>[\s\S]*<\/title>/i);
 
         if (matchTitle != null) {
             var title = matchTitle[0].replace(/^<title.*?>/i, '').replace(/<\/title>$/i, '');
-            return _clear(title);
+            return clearHtml(title);
         }
 
         return null;
     }
 
-    // Used for call Page Method
-    function _method(name, args, onsuccess, onerror) {
-
-        var url = location.href.replace(/\?.*$/, '') + '/' + name;
-
-        return $.ajax({
-            type: 'POST',
-            url: url,
-            data: args == null ? null : JSON.stringify(args),
-            contentType: 'application/json; charset=utf-8',
-            dataType: 'json',
-            cache: false,
-            success: function (r) {
-                if (onsuccess) onsuccess(r.d);
-            },
-            error: function (r) {
-
-                var err = '';
-
-                try {
-                    err = JSON.parse(r.responseText).Message;
-                }
-                catch (e) {
-                    err = _title(r.responseText);
-                }
-
-                if (onerror) onerror(err);
-                else if (AjaxPage.onerror) AjaxPage.onerror(err);
-            }
-        });
-    }
 
 })(this, jQuery);

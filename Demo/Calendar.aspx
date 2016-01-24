@@ -3,7 +3,7 @@
 
     protected void cal_SelectionChanged(object sender, EventArgs e)
     {
-        ScriptManager.RegisterClientScriptBlock(this, this.GetType(), "key", "alert('Script from Server: " + cal.SelectedDate.ToShortDateString() + "');", true);
+        cal1.Text = cal.SelectedDate.ToShortDateString();
     }
 
 </script>
@@ -22,5 +22,7 @@
         <TodayDayStyle BackColor="#CCCCCC" ForeColor="Black" />
         <WeekendDayStyle BackColor="#FFFFCC" />
     </asp:Calendar>
+
+    <asp:Literal runat="server" ID="cal1" />
 
 </asp:Content>
