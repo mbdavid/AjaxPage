@@ -161,22 +161,11 @@
         // setting title
         document.title = title(html) || document.title;
 
-        // getting all scripts in body that will be run later
-        if (matchBody) {
-            addScripts(matchBody[0], scripts, true);
-        }
-
         // append all styles in header
         if (matchStyle) {
             for (var i = 0; i < matchStyle.length; i++) {
                 $('head').append(matchStyle[i]);
             }
-        }
-
-        // if has scripts in head tag, add to cache and list too
-        // if is a GET, execute inline scripts
-        if (matchHead) {
-            addScripts(matchHead[0], scripts, verb == 'GET');
         }
 
         if (matchForm) {
@@ -198,6 +187,7 @@
 
             // if action is different from location, change location
             if (a.href != location.href) {
+                verb = 'GET';
                 history.pushState(null, null, a.href);
             }
 
@@ -217,6 +207,17 @@
         var base = $('base');
         if (base.length == 0) base = $('<base>').appendTo($('head'));
         base.attr('href', location.href);
+
+        // if has scripts in head tag, add to cache and list too
+        // if is a GET, execute inline scripts
+        if (matchHead) {
+            addScripts(matchHead[0], scripts, verb == 'GET');
+        }
+
+        // getting all scripts in body that will be run later
+        if (matchBody) {
+            addScripts(matchBody[0], scripts, true);
+        }
 
         // execute all scripts on array
         $.each(scripts, function (index, script) {
