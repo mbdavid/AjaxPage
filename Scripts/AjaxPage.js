@@ -192,12 +192,14 @@
             form = form.replace(/<style.*>[\s\S]*<\/style>/gi, '');
             form = form.replace(/<script.*?>[\s\S]*?<\/.*?script>/gi, '');
 
-            // if action is different from location bar, change location bar
-            history.replaceState(null, null, action);
+            // create a link A to resolve relative URL from action form
+            var a = document.createElement('a');
+            a.href = action;
 
-            //TODO: problem: erase last REDIRECT page from history
-            //console.log('action=', action);
-            //console.log('location.href=', location.href);
+            // if action is different from location, change location
+            if (a.href != location.href) {
+                history.pushState(null, null, a.href);
+            }
 
             // update form action and content
             $('form').attr('action', action).html(form);
