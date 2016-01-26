@@ -1,6 +1,6 @@
-﻿/*
-  Ajax Library
-  ============
+/*
+  Ajax Page
+  =========
   How works: 
   1) After GET
     a) Capture all image/submit buttons
@@ -17,19 +17,26 @@
     Inline: body > Always - head > Only GET
     External: body || head > Only first time - cache-it.
 
-//TODO:
+=> TODO:
     - <link rel=stylesheet> works only when in master page (full GET)
     - How works with pageLoad/$(fn)/...
 
 => TARGET: page must works FINE without this lib. If, in future, I want remove, every needs works
     - This is not means that all apps works only adding this .js
 
+=> Server changes:
+    - Server must send response header "X-Ajax-Path" with responseURL !!
+
+    private void Context_BeginRequest(object sender, EventArgs e)
+    {
+        context.Response.Headers["X-Ajax-Path"] = context.Request.Url.PathAndQuery;
+    }
 */
 
 (function (window, $) {
 
     var cache = {}; // cache scripts
-    var headers = { 'X-Ajax-Page': '1' }; // header on request to identify AjaxPage GET/POST
+    var headers = { 'X-Ajax-Request': '1' }; // header on request to identify AjaxPage GET/POST
     var xhr = null;
 
     // start ajaxpage
@@ -121,12 +128,12 @@
             processData: false,
             contentType: false,
             success: function (data, textStatus, jqXHR) {
-                updatePage(data);
+                updatePage(data, 'POST', jqXHR.getResponseHeader('X-Ajax-Path'));
                 $(window).trigger('load');
             },
             error: function(data, args, textStatus) {
                 if (textStatus != 'abort') {
-                    updatePage(data.responseText);
+                    updateError(data.responseText);
                 }
             }
         };
@@ -150,7 +157,7 @@
     }
 
     // update body page
-    function updatePage(html, verb) {
+    function updatePage(html, verb, url) {
 
         var matchHead = html.match(/<head.*>[\s\S]*<\/head>/i);
         var matchBody = html.match(/<body.*>[\s\S]*<\/body>/i);
@@ -173,17 +180,14 @@
             var form = matchForm[0];
             var focus = $(document.activeElement).attr('id');
 
-            // get form action and update in current form
-            var action = clearHtml(form.match(/action=["'](.*?)["']/i)[1]);
-
             // removing <form> tag, styles and scripts
             form = form.replace(/^<form.*?>/i, '').replace(/<\/form>$/i, '');
             form = form.replace(/<style.*>[\s\S]*<\/style>/gi, '');
             form = form.replace(/<script.*?>[\s\S]*?<\/.*?script>/gi, '');
 
-            // create a link A to resolve relative URL from action form
+            // checks if url != location.href
             var a = document.createElement('a');
-            a.href = action;
+            a.href = url;
 
             // if action is different from location, change location
             if (a.href != location.href) {
@@ -192,12 +196,17 @@
             }
 
             // update form action and content
-            $('form').attr('action', action).html(form);
+            $('form').attr('action', url).html(form);
 
             // set focus
-            if (focus) {
-                $('#' + focus).focus();
-            }
+            setTimeout(function () {
+                if (verb == 'GET') {
+                    $('[autofocus]').focus();
+                }
+                else if (verb == 'POST' && focus) {
+                    $('#' + focus).focus();
+                }
+            }, 0);
         }
 
         // clear all variables from WebResources.axd
@@ -223,6 +232,21 @@
         $.each(scripts, function (index, script) {
             $('head').append(script);
         });
+    }
+
+    // update page with server error message
+    function updateError(html) {
+        var matchBody = html.match(/<body.*>[\s\S]*<\/body>/i);
+
+        if (matchBody) {
+            var err = matchBody[0].replace(/^<body.*?>/i, '').replace(/<\/body>$/i, '');
+            err = err.replace(/<style.*>[\s\S]*<\/style>/gi, '');
+            err = err.replace(/<script.*?>[\s\S]*?<\/.*?script>/gi, '');
+            err = err.replace(/width=100%/ig, ''); // why not?
+            $('form').html('<div class="error">' + err + '</div>');
+        }
+        document.title = title(html) || 'PageError';
+        console.error(document.title);
     }
 
     // get all scripts that are not in cache
@@ -301,12 +325,12 @@
             processData: false,
             contentType: false,
             success: function (data, textStatus, jqXHR) {
-                updatePage(data, 'GET');
+                updatePage(data, 'GET', jqXHR.getResponseHeader('X-Ajax-Path'));
                 $(window).trigger('load');
             },
             error: function (data, args, textStatus) {
                 if (textStatus != 'abort') {
-                    updatePage(data.responseText);
+                    updateError(data.responseText);
                 }
             }
         };
